@@ -11,14 +11,16 @@
         h2 { margin-top: 0; color: #1a365d; text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; }
         label { display: block; font-weight: bold; margin-top: 15px; margin-bottom: 5px; color: #4a5568; font-size: 14px; }
         input, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e0; box-sizing: border-box; font-size: 15px; font-family: inherit; }
-        button { width: 100%; padding: 15px; margin-top: 20px; border-radius: 8px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.2s; }
+        button { width: 100%; padding: 15px; margin-top: 15px; border-radius: 8px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.2s; }
         .btn-primary { background-color: #1a365d; color: white; }
         .btn-ladder { background-color: #d97706; color: white; font-size: 18px; }
         .btn-secondary { background-color: #718096; color: white; margin-top: 10px; }
         
+        /* 카톡 복사 버튼 스타일 */
+        .btn-kakao { background-color: #FEE500; color: #000000; margin-bottom: 5px; }
+        
         .loading { text-align: center; color: #666; font-size: 14px; padding: 20px; font-weight: bold; }
         
-        /* 토글 스위치 및 명단 스타일 */
         .player-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #edf2f7; transition: opacity 0.2s; }
         .player-item.excluded { opacity: 0.4; background-color: #f8fafc; }
         .player-item.excluded .player-name { text-decoration: line-through; color: #a0aec0; }
@@ -27,7 +29,6 @@
         .player-name { font-weight: bold; font-size: 16px; transition: color 0.2s; }
         .player-select { width: 130px; margin: 0; padding: 8px; font-size: 14px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; }
         
-        /* 체크박스 스타일링 */
         input[type="checkbox"] { width: 20px; height: 20px; accent-color: #1a365d; cursor: pointer; }
 
         .room-box { background-color: #ebf8ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
@@ -41,6 +42,7 @@
 <div class="container">
     <div id="loadingMsg" class="card loading">구글 시트에서 명단을 불러오는 중입니다...</div>
 
+    <!-- 1단계: 날짜 선택 및 방 개수 세팅 -->
     <div class="card" id="step1" style="display: none;">
         <h2>🏠 자동 연동 방 배정기</h2>
         
@@ -54,6 +56,7 @@
         <button class="btn-primary" onclick="goToStep2()">명단 확인 및 배정 설정 ➔</button>
     </div>
 
+    <!-- 2단계: 수동 지정, 제외 선택 및 사다리 돌리기 -->
     <div class="card" id="step2" style="display: none;">
         <h2>🎯 배정 설정</h2>
         <div class="help-text">
@@ -67,10 +70,14 @@
         <button class="btn-secondary" onclick="location.reload()">처음으로 돌아가기</button>
     </div>
 
+    <!-- 3단계: 결과 화면 -->
     <div class="card" id="step3" style="display: none;">
         <h2>🎉 방 배정 완료!</h2>
         
         <div id="resultBox"></div>
+        
+        <!-- ★ 추가된 복사 버튼 -->
+        <button class="btn-kakao" onclick="copyToKakao()">💬 카톡으로 결과 복사하기</button>
         
         <button class="btn-primary" onclick="resetToStep2()">🔙 멤버 그대로 다시 사다리 타기</button>
         <button class="btn-secondary" onclick="location.reload()">처음부터 다시</button>
@@ -78,15 +85,15 @@
 </div>
 
 <script>
-    // ★ 본인의 구글 시트 웹게시 링크 (랭킹 앱과 동일)
+    // ★ 본인의 구글 시트 웹게시 링크
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPc5vmxIbF91Tq-sHJU0OAm52uM5gezsNv2iUyU_776aEwnZjYakpbhn8hHl696Q19EiD8CD0xvPYu/pub?output=csv';
 
     let allRecords = [];
     let availableDates = [];
     let playersForDate = [];
     let rooms = [];
+    let finalResultText = ""; // 카톡 복사용 텍스트 저장 변수
 
-    // 구글 시트에서 데이터 불러오기
     async function fetchData() {
         try {
             const response = await fetch(CSV_URL);
@@ -103,7 +110,6 @@
         }
     }
 
-    // CSV 파싱 로직 (이름과 날짜만 추출)
     function parseCSV(csvText) {
         const lines = csvText.split('\n');
         allRecords = [];
@@ -114,7 +120,6 @@
         let dateIdx = headers.findIndex(h => h.includes('날짜'));
         let nameIdx = headers.findIndex(h => h.includes('이름'));
 
-        // 헤더를 못 찾은 경우 기본 위치
         if (dateIdx === -1 || nameIdx === -1) {
             dateIdx = headers[0].includes('타임스탬프') ? 1 : 0;
             nameIdx = headers[0].includes('타임스탬프') ? 2 : 1;
@@ -135,11 +140,9 @@
             }
         }
         
-        // 고유 날짜 추출 후 최신순 정렬
         availableDates = [...new Set(allRecords.map(r => r.date))].sort().reverse();
     }
 
-    // 날짜 드롭다운 채우기
     function populateDates() {
         const select = document.getElementById('dateSelect');
         availableDates.forEach(date => {
@@ -150,7 +153,6 @@
         });
     }
 
-    // 1단계 -> 2단계로 넘어갈 때 UI 생성
     function goToStep2() {
         const selectedDate = document.getElementById('dateSelect').value;
         const roomText = document.getElementById('roomNames').value;
@@ -161,7 +163,6 @@
             return;
         }
 
-        // 선택한 날짜의 멤버만 필터링 (중복 제거)
         const rawPlayers = allRecords.filter(r => r.date === selectedDate).map(r => r.name);
         playersForDate = [...new Set(rawPlayers)];
 
@@ -170,14 +171,12 @@
             return;
         }
 
-        // 방 목록 세팅
         rooms = [];
         roomNameList.forEach((name, idx) => {
             let displayName = isNaN(name) ? name : `${name}번 방`;
             rooms.push({ id: `room_${idx}`, name: displayName });
         });
 
-        // 2단계 명단 UI 그리기
         let html = '';
         playersForDate.forEach((player, idx) => {
             html += `
@@ -199,7 +198,6 @@
         document.getElementById('step2').style.display = 'block';
     }
 
-    // 체크박스 클릭 시 스타일 회색 처리
     function togglePlayer(idx) {
         const isChecked = document.getElementById(`chk_${idx}`).checked;
         const itemDiv = document.getElementById(`item_${idx}`);
@@ -214,9 +212,7 @@
         }
     }
 
-    // 사다리 로직 실행
     function runLadder() {
-        // 참여할 사람만 골라내기
         let activePlayers = [];
         playersForDate.forEach((player, idx) => {
             if (document.getElementById(`chk_${idx}`).checked) {
@@ -232,27 +228,19 @@
             return;
         }
 
-        // 기본 2명씩, 남는 인원 분배를 위한 수학적 방 정원 계산
         let roomSlots = {};
         let roomOccupants = {};
         
         let baseCap = Math.floor(activePlayers.length / rooms.length);
         let remainder = activePlayers.length % rooms.length;
 
-        // 인원이 너무 적으면 경고 없이 진행, 인원이 많으면(3명 이상) 안내
-        if (baseCap >= 3 || (baseCap === 2 && remainder > 0)) {
-            console.log("일부 방에 3명 이상이 배정됩니다.");
-        }
-
         rooms.forEach((r, idx) => {
-            // 나머지는 앞 방부터 1자리씩 더 채워줌 (가장 균등한 분배)
             roomSlots[r.id] = baseCap + (idx < remainder ? 1 : 0);
             roomOccupants[r.id] = [];
         });
 
         let randomPool = [];
 
-        // 1. 수동 지정된 사람 먼저 넣기
         for (let i = 0; i < activePlayers.length; i++) {
             const p = activePlayers[i];
             if (p.assign !== 'random') {
@@ -263,7 +251,6 @@
             }
         }
 
-        // 유효성 검사 (수동으로 너무 많이 넣은 경우)
         for (let rId in roomSlots) {
             if (roomSlots[rId] < 0) {
                 const overRoom = rooms.find(r => r.id === rId);
@@ -272,7 +259,6 @@
             }
         }
 
-        // 2. 빈자리(Slot) 모으기
         let availableSlots = [];
         for (let rId in roomSlots) {
             for (let i = 0; i < roomSlots[rId]; i++) {
@@ -280,40 +266,70 @@
             }
         }
 
-        // 빈자리 셔플
         for (let i = availableSlots.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [availableSlots[i], availableSlots[j]] = [availableSlots[j], availableSlots[i]];
         }
 
-        // 사다리 명단 셔플
         for (let i = randomPool.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [randomPool[i], randomPool[j]] = [randomPool[j], randomPool[i]];
         }
 
-        // 3. 배정
         randomPool.forEach((player, idx) => {
             const targetRoomId = availableSlots[idx];
             roomOccupants[targetRoomId].push(player);
         });
 
-        // 4. 결과 출력
         let resultHtml = '';
+        
+        // ★ 텍스트 복사용 포맷 생성
+        finalResultText = "[⛳ 오늘의 방 배정 결과]\n\n";
+
         rooms.forEach(r => {
             const playersInRoom = roomOccupants[r.id];
-            // 해당 방에 인원이 0명인 경우 숨길지 여부 (일단 다 보여줌)
+            const playersStr = playersInRoom.length > 0 ? playersInRoom.join(', ') : '빈 방';
+            
+            // 화면 출력용 HTML
             resultHtml += `
                 <div class="room-box">
                     <div class="room-title">🚪 ${r.name} <span style="font-size:14px; color:#4a5568; font-weight:normal;">(${playersInRoom.length}명)</span></div>
                     <div class="room-members">${playersInRoom.length > 0 ? playersInRoom.join(' / ') : '<span style="color:#a0aec0;font-size:14px;">빈 방</span>'}</div>
                 </div>
             `;
+            
+            // 클립보드 복사용 텍스트
+            finalResultText += `🚪 ${r.name}: ${playersStr}\n`;
         });
 
         document.getElementById('resultBox').innerHTML = resultHtml;
         document.getElementById('step2').style.display = 'none';
         document.getElementById('step3').style.display = 'block';
+    }
+    
+    // ★ 클립보드 복사 함수
+    function copyToKakao() {
+        if(navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(finalResultText).then(() => {
+                alert('결과가 복사되었습니다! 카톡창에 길게 눌러 [붙여넣기] 해주세요.');
+            }).catch(err => {
+                alert('복사에 실패했습니다. 직접 화면을 캡처해 주세요.');
+            });
+        } else {
+            // 구형 브라우저 지원용 예비 코드
+            let textArea = document.createElement("textarea");
+            textArea.value = finalResultText;
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert('결과가 복사되었습니다! 카톡창에 길게 눌러 [붙여넣기] 해주세요.');
+            } catch (err) {
+                alert('복사에 실패했습니다. 직접 화면을 캡처해 주세요.');
+            }
+            document.body.removeChild(textArea);
+        }
     }
 
     function resetToStep2() {
@@ -321,7 +337,6 @@
         document.getElementById('step2').style.display = 'block';
     }
 
-    // 앱 시작
     fetchData();
 </script>
 
