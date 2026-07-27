@@ -61,7 +61,7 @@
         <h2>🎯 배정 설정</h2>
         <div class="help-text">
             체크 해제 시 배정에서 <b>제외</b>됩니다.<br>
-            특정 방에 고정할 사람은 방 번호를 선택하세요.
+            특정 방에 고정할 사람은 제한 없이 자유롭게 방 번호를 선택하세요.
         </div>
         
         <div id="playerSetupList"></div>
@@ -76,7 +76,6 @@
         
         <div id="resultBox"></div>
         
-        <!-- ★ 추가된 복사 버튼 -->
         <button class="btn-kakao" onclick="copyToKakao()">💬 카톡으로 결과 복사하기</button>
         
         <button class="btn-primary" onclick="resetToStep2()">🔙 멤버 그대로 다시 사다리 타기</button>
@@ -85,14 +84,13 @@
 </div>
 
 <script>
-    // ★ 본인의 구글 시트 웹게시 링크
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPc5vmxIbF91Tq-sHJU0OAm52uM5gezsNv2iUyU_776aEwnZjYakpbhn8hHl696Q19EiD8CD0xvPYu/pub?output=csv';
 
     let allRecords = [];
     let availableDates = [];
     let playersForDate = [];
     let rooms = [];
-    let finalResultText = ""; // 카톡 복사용 텍스트 저장 변수
+    let finalResultText = "";
 
     async function fetchData() {
         try {
@@ -212,6 +210,7 @@
         }
     }
 
+    // ★ 인원 제한 해제된 사다리 배정 로직
     function runLadder() {
         let activePlayers = [];
         playersForDate.forEach((player, idx) => {
@@ -228,69 +227,47 @@
             return;
         }
 
-        let roomSlots = {};
         let roomOccupants = {};
-        
-        let baseCap = Math.floor(activePlayers.length / rooms.length);
-        let remainder = activePlayers.length % rooms.length;
-
-        rooms.forEach((r, idx) => {
-            roomSlots[r.id] = baseCap + (idx < remainder ? 1 : 0);
+        rooms.forEach(r => {
             roomOccupants[r.id] = [];
         });
 
         let randomPool = [];
 
+        // 1. 수동 지정 멤버 먼저 배치 (제한 없이 모든 지정 인원 허용)
         for (let i = 0; i < activePlayers.length; i++) {
             const p = activePlayers[i];
             if (p.assign !== 'random') {
                 roomOccupants[p.assign].push(p.name);
-                roomSlots[p.assign]--;
             } else {
                 randomPool.push(p.name);
             }
         }
 
-        for (let rId in roomSlots) {
-            if (roomSlots[rId] < 0) {
-                const overRoom = rooms.find(r => r.id === rId);
-                alert(`[${overRoom.name}]에 지정된 인원이 너무 많습니다. 수동 배정을 줄여주세요!`);
-                return;
-            }
-        }
-
-        let availableSlots = [];
-        for (let rId in roomSlots) {
-            for (let i = 0; i < roomSlots[rId]; i++) {
-                availableSlots.push(rId);
-            }
-        }
-
-        for (let i = availableSlots.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [availableSlots[i], availableSlots[j]] = [availableSlots[j], availableSlots[i]];
-        }
-
+        // 2. 랜덤 대상 멤버 섞기
         for (let i = randomPool.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [randomPool[i], randomPool[j]] = [randomPool[j], randomPool[i]];
         }
 
-        randomPool.forEach((player, idx) => {
-            const targetRoomId = availableSlots[idx];
-            roomOccupants[targetRoomId].push(player);
+        // 3. 랜덤 멤버들을 현재 인원이 가장 적은 방에 하나씩 순차적으로 배정
+        randomPool.forEach(player => {
+            let minCount = Math.min(...rooms.map(r => roomOccupants[r.id].length));
+            let candidateRooms = rooms.filter(r => roomOccupants[r.id].length === minCount);
+            
+            // 인원수가 가장 적은 방 중에서 무작위 하나 선택
+            let chosenRoom = candidateRooms[Math.floor(Math.random() * candidateRooms.length)];
+            roomOccupants[chosenRoom.id].push(player);
         });
 
+        // 4. 결과 출력
         let resultHtml = '';
-        
-        // ★ 텍스트 복사용 포맷 생성
         finalResultText = "[⛳ 오늘의 방 배정 결과]\n\n";
 
         rooms.forEach(r => {
             const playersInRoom = roomOccupants[r.id];
             const playersStr = playersInRoom.length > 0 ? playersInRoom.join(', ') : '빈 방';
             
-            // 화면 출력용 HTML
             resultHtml += `
                 <div class="room-box">
                     <div class="room-title">🚪 ${r.name} <span style="font-size:14px; color:#4a5568; font-weight:normal;">(${playersInRoom.length}명)</span></div>
@@ -298,7 +275,6 @@
                 </div>
             `;
             
-            // 클립보드 복사용 텍스트
             finalResultText += `🚪 ${r.name}: ${playersStr}\n`;
         });
 
@@ -306,8 +282,7 @@
         document.getElementById('step2').style.display = 'none';
         document.getElementById('step3').style.display = 'block';
     }
-    
-    // ★ 클립보드 복사 함수
+
     function copyToKakao() {
         if(navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(finalResultText).then(() => {
@@ -316,7 +291,6 @@
                 alert('복사에 실패했습니다. 직접 화면을 캡처해 주세요.');
             });
         } else {
-            // 구형 브라우저 지원용 예비 코드
             let textArea = document.createElement("textarea");
             textArea.value = finalResultText;
             document.body.appendChild(textArea);
